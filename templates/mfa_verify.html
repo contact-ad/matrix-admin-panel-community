@@ -1,0 +1,3 @@
+{% extends "base.html" %}{% block title %}Vérification MFA{% endblock %}{% block content %}
+<div class="login-wrap"><section class="login-card"><div class="hero-icon">2F</div><h1>Vérification MFA</h1><p class="muted">Compte : {{ username }}. Saisis le code à 6 chiffres de ton application d’authentification ou un code de secours.</p>
+<form method="post" class="form-stack"><label>Code MFA<input name="code" autocomplete="one-time-code" autofocus required></label><button class="btn btn-primary btn-wide">Vérifier</button></form></section></div>{% endblock %}

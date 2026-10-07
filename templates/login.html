@@ -1,0 +1,7 @@
+
+{% extends "base.html" %}{% block title %}Connexion{% endblock %}{% block content %}
+<div class="login-wrap"><section class="login-card"><div class="hero-icon">◆</div><h1>Administration Matrix</h1>
+<p class="muted">Gestion des comptes et des instances Matrix / Synapse.</p>
+<form method="post" class="form-stack"><label>Identifiant<input name="username" autocomplete="username" required autofocus></label>
+<label>Mot de passe<input type="password" name="password" autocomplete="current-password" required></label>
+<button class="btn btn-primary btn-wide">Se connecter</button></form></section></div>{% endblock %}

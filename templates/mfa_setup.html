@@ -1,0 +1,8 @@
+{% extends "base.html" %}{% block title %}MFA{% endblock %}{% block content %}
+<section class="page-head"><div><p class="eyebrow">SÉCURITÉ</p><h1>Authentification multifacteur</h1><p class="muted">Protection du portail d’administration avec une application TOTP.</p></div></section>
+{% if just_enabled %}<div class="alert alert-success"><strong>MFA activée.</strong> Enregistre immédiatement les codes de secours ci-dessous. Ils ne seront plus affichés.</div>
+<section class="panel"><h2>Codes de secours</h2><div class="recovery-grid">{% for c in recovery_codes %}<code>{{ c }}</code>{% endfor %}</div><p class="muted top-gap">Chaque code ne fonctionne qu’une seule fois.</p></section>
+{% elif enabled %}<section class="panel"><h2>MFA active ✅</h2><p class="muted">Ton compte portail est protégé par une deuxième étape de connexion.</p></section>
+{% else %}<div class="grid mfa-grid"><section class="panel"><h2>1. Scanner le QR code</h2><img class="qr" src="{{ qr }}" alt="QR code MFA"><p class="muted">Compatible Microsoft Authenticator, Google Authenticator, 1Password, Bitwarden, etc.</p></section>
+<section class="panel"><h2>2. Vérifier le code</h2><p class="muted">Clé manuelle :</p><code class="secret">{{ secret }}</code><form method="post" class="form-stack"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><label>Code à 6 chiffres<input name="code" inputmode="numeric" pattern="[0-9]{6}" required></label><button class="btn btn-primary">Activer la MFA</button></form></section></div>{% endif %}
+{% endblock %}

@@ -1,0 +1,127 @@
+{% extends "base.html" %}{% block title %}{{ inst.name }}{% endblock %}{% block content %}
+<section class="page-head"><div><p class="eyebrow">{{ "INSTANCE PRINCIPALE" if inst.is_primary else "CLIENT" }}</p><h1>{{ inst.name }}</h1><p class="muted">{{ inst.chat_domain }} · {{ inst.rtc_domain }}</p></div><a class="btn btn-secondary" href="{{ url_for('dashboard') }}">← Retour</a></section>
+<div class="grid summary-grid"><div class="summary-card"><span>Synapse</span><strong>{{ status.synapse.status }}</strong><small>{{ status.synapse.health }}</small></div><div class="summary-card"><span>PostgreSQL</span><strong>{{ status.postgres.status }}</strong><small>{{ status.postgres.health }}</small></div><div class="summary-card"><span>Utilisateurs</span><strong>{{ users|length }}</strong><small>comptes visibles</small></div></div>
+
+<section class="panel"><div class="panel-head"><div><h2>Ajouter un utilisateur</h2><p class="muted">L’identifiant ne contient pas d’espace. Le nom affiché peut en contenir.</p></div></div>
+<form method="post" action="{{ url_for('user_add',slug=inst.slug) }}" class="form-grid"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+<label>Identifiant Matrix<input name="localpart" placeholder="dorian.bougassas" pattern="[a-z0-9._=-]+" required></label>
+<label>Nom affiché<input name="display_name" placeholder="Dorian Bougassas" required></label><label>Mot de passe<input type="password" name="password" minlength="8" required></label>
+{% if portal_user['role']=='superadmin' %}<label class="check"><input type="checkbox" name="make_admin" value="1"> Administrateur Matrix</label>{% endif %}
+<button class="btn btn-primary">Créer l’utilisateur</button></form></section>
+
+<section class="panel">
+<div class="panel-head"><div><h2>Utilisateurs</h2><p class="muted">Création, mot de passe, désactivation réversible et réactivation.</p></div></div>
+
+<div class="operation-note">
+<strong>À savoir :</strong> une désactivation Matrix invalide les sessions et supprime les appareils/clés E2EE, puis retire l’utilisateur de ses salons.
+La réactivation remet le compte en service avec un nouveau mot de passe, mais ne restaure pas automatiquement ces éléments.
+{% if portal_user['role']=='superadmin' %}<br><strong>Effacer le compte</strong> applique <code>erase=true</code> mais <strong>conserve volontairement les anciens messages et fichiers dans les salons</strong> afin de ne pas casser l’historique des autres utilisateurs.{% endif %}
+</div>
+
+<div class="table-wrap"><table><thead><tr><th>Utilisateur</th><th>Rôle</th><th>État</th><th>Actions</th></tr></thead><tbody>
+{% for user in users %}
+<tr>
+<td class="mono">{{ user.id }}</td>
+<td><span class="pill">{{ user.role }}</span></td>
+<td>{% if user.status=='ACTIF' %}<span class="status ok">● Actif</span>{% else %}<span class="status muted-status">● Désactivé</span>{% endif %}</td>
+<td class="actions"><div class="action-stack">
+
+{% if user.status=='ACTIF' %}
+  {% if not (portal_user['role']!='superadmin' and user.role=='ADMIN') %}
+  <details class="reset-box">
+    <summary class="btn btn-secondary btn-small">Mot de passe</summary>
+    <form method="post" action="{{ url_for('user_password',slug=inst.slug) }}" class="mini-form">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <input type="hidden" name="user_id" value="{{ user.id }}">
+      <input type="password" name="new_password" minlength="8" placeholder="Nouveau mot de passe" required>
+      <input type="password" name="confirm_password" minlength="8" placeholder="Confirmer" required>
+      <button class="btn btn-primary btn-small">Réinitialiser</button>
+    </form>
+  </details>
+
+  <form method="post" action="{{ url_for('user_deactivate',slug=inst.slug) }}" data-confirm="Désactiver {{ user.id }} ? Il sera retiré de ses salons et ses appareils/clés E2EE seront supprimés.">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <input type="hidden" name="user_id" value="{{ user.id }}">
+    <button class="btn btn-warning btn-small">Désactiver</button>
+  </form>
+  {% endif %}
+{% else %}
+  {% if not (portal_user['role']!='superadmin' and user.role=='ADMIN') %}
+  <details class="reset-box">
+    <summary class="btn btn-success btn-small">Réactiver</summary>
+    <form method="post" action="{{ url_for('user_reactivate',slug=inst.slug) }}" class="mini-form">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <input type="hidden" name="user_id" value="{{ user.id }}">
+      <strong>Nouveau mot de passe obligatoire</strong>
+      <input type="password" name="new_password" minlength="8" placeholder="Nouveau mot de passe" required>
+      <input type="password" name="confirm_password" minlength="8" placeholder="Confirmer" required>
+      <button class="btn btn-success btn-small">Réactiver le compte</button>
+    </form>
+  </details>
+  {% endif %}
+{% endif %}
+
+{% if portal_user['role']=='superadmin' and not user.id.startswith('@portal-admin-') %}
+<button
+  type="button"
+  class="btn btn-danger btn-small js-open-erase"
+  data-user-id="{{ user.id|e }}"
+>
+  Effacer le compte
+</button>
+{% endif %}
+
+</div></td>
+</tr>
+{% else %}<tr><td colspan="4" class="empty">Aucun utilisateur.</td></tr>{% endfor %}
+</tbody></table></div></section>
+
+{% if portal_user['role']=='superadmin' %}
+<div class="modal-backdrop" id="erase-modal" hidden aria-hidden="true">
+  <div class="modal-card modal-danger" role="dialog" aria-modal="true" aria-labelledby="erase-modal-title">
+    <div class="modal-head">
+      <div>
+        <p class="eyebrow danger-eyebrow">SUPPRESSION DU COMPTE</p>
+        <h2 id="erase-modal-title">Effacer ce compte ?</h2>
+      </div>
+      <button type="button" class="modal-close js-close-erase" aria-label="Fermer">×</button>
+    </div>
+
+    <div class="modal-user">
+      <span>Utilisateur</span>
+      <strong class="mono" id="erase-modal-user"></strong>
+    </div>
+
+    <div class="modal-warning">
+      <strong>Action irréversible sur le compte.</strong>
+      <p>
+        Le compte sera désactivé et marqué comme effacé avec <code>erase=true</code>.
+        Les anciens messages et fichiers déjà partagés dans les salons seront conservés
+        afin de ne pas casser l’historique des autres utilisateurs.
+      </p>
+    </div>
+
+    <form method="post" action="{{ url_for('user_erase',slug=inst.slug) }}" id="erase-modal-form" class="modal-form">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <input type="hidden" name="user_id" id="erase-modal-user-input" value="">
+
+      <label>
+        Pour confirmer, saisis <strong>EFFACER</strong>
+        <input
+          name="confirmation"
+          id="erase-modal-confirmation"
+          autocomplete="off"
+          placeholder="EFFACER"
+          required
+        >
+      </label>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary js-close-erase">Annuler</button>
+        <button type="submit" class="btn btn-danger">Effacer le compte</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

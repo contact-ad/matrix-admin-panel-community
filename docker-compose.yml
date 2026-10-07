@@ -1,0 +1,22 @@
+services:
+  matrix-admin-panel:
+    build: .
+    container_name: matrix-admin-panel
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # SECURITY: Docker socket grants host-level control to the container.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./data:/data
+      - ./config:/config:ro
+    ports:
+      # Bind to localhost. Put a TLS reverse proxy in front for production.
+      - "127.0.0.1:${PANEL_PORT:-8090}:8090"
+    networks:
+      - matrix
+
+networks:
+  matrix:
+    external: true
+    name: ${MATRIX_NETWORK}

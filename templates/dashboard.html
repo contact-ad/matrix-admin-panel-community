@@ -1,0 +1,9 @@
+
+{% extends "base.html" %}{% block title %}Tableau de bord{% endblock %}{% block content %}
+<section class="page-head"><div><p class="eyebrow">INFRASTRUCTURE</p><h1>Tableau de bord Matrix</h1><p class="muted">Instances Synapse, utilisateurs et état des services.</p></div></section>
+<div class="grid cards">{% for card in cards %}<a class="client-card" href="{{ url_for('client_detail',slug=card.inst.slug) }}">
+<div class="card-top"><div><span class="tag">{{ "PRINCIPALE" if card.inst.is_primary else "CLIENT" }}</span><h2>{{ card.inst.name }}</h2></div>
+{% if card.status.synapse.status=='running' and card.status.postgres.status=='running' %}<span class="status ok">● En ligne</span>{% else %}<span class="status bad">● À vérifier</span>{% endif %}</div>
+<div class="domains"><span>💬 {{ card.inst.chat_domain }}</span><span>📞 {{ card.inst.rtc_domain or "RTC non détecté" }}</span></div>
+<div class="metrics"><div><strong>{{ card.active_users }}</strong><small>utilisateurs actifs</small></div><div><strong>{{ card.status.synapse.health }}</strong><small>Synapse</small></div><div><strong>{{ card.status.postgres.health }}</strong><small>PostgreSQL</small></div></div>
+</a>{% endfor %}</div>{% endblock %}

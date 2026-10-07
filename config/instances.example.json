@@ -1,0 +1,20 @@
+[
+  {
+    "slug": "main",
+    "name": "My Matrix",
+    "chat_domain": "chat.example.com",
+    "rtc_domain": "rtc.example.com",
+    "synapse_container": "matrix-synapse",
+    "postgres_container": "matrix-postgres",
+    "primary": true
+  },
+  {
+    "slug": "client-a",
+    "name": "Client A",
+    "chat_domain": "chat.client-a.example",
+    "rtc_domain": "rtc.client-a.example",
+    "synapse_container": "matrix-client-a-synapse",
+    "postgres_container": "matrix-client-a-postgres",
+    "primary": false
+  }
+]
