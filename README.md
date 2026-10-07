@@ -1,20 +1,22 @@
 # Matrix Admin Panel Community
 
-A lightweight self-hosted administration portal for **Matrix Synapse** deployments.
+A lightweight self-hosted administration panel for **Matrix Synapse** deployments.
 
-The project provides a web interface for common account operations while keeping Synapse as the source of truth.
+Matrix Admin Panel provides a simple web interface for common Synapse administration tasks while keeping Synapse as the source of truth.
 
 ## Features
 
-- Multiple configured Synapse instances
-- Matrix user listing
+- Manage multiple Synapse instances
+- List Matrix users
 - Create local Matrix users
-- Reset passwords and invalidate existing sessions
+- Reset user passwords
+- Invalidate existing sessions after password reset
 - Reversible account deactivation
 - Account reactivation with a new password
-- `erase=true` account erasure while preserving room history
-- Portal accounts scoped to one configured client instance
-- Mandatory TOTP MFA for portal administrators and client accounts
+- Account erasure using `erase=true`
+- Preserve existing room history when erasing an account
+- Client portal accounts scoped to a specific Matrix instance
+- Mandatory TOTP MFA
 - Recovery codes
 - Audit log
 - Docker container status
@@ -28,50 +30,57 @@ This application mounts:
 /var/run/docker.sock
 ```
 
-Access to the Docker socket is effectively **host-level/root-equivalent control**.
+Access to the Docker socket is effectively equivalent to **root-level access on the Docker host**.
 
-Do not expose this panel casually to the public Internet. Use TLS, strong authentication, MFA, network restrictions where possible, backups, and normal host hardening. Read [SECURITY.md](SECURITY.md) before production deployment.
+For production:
 
-This project has **not** undergone an independent security audit.
+- Always use HTTPS
+- Enable MFA
+- Use strong passwords
+- Restrict network access when possible
+- Keep Docker and Linux updated
+- Protect backups and configuration files
+
+Please read `SECURITY.md` before deploying this application in production.
+
+This project has **not undergone an independent security audit**.
 
 ## Requirements
 
-- Linux host
+- Linux
 - Docker Engine
 - Docker Compose v2+
-- An existing Synapse container
-- Synapse and the panel attached to the same Docker network
+- Existing Matrix Synapse container
+- Synapse and the panel connected to the same Docker network
 - `register_new_matrix_user` available inside the Synapse container
-- HTTPS reverse proxy for production use
-
-The portal creates a dedicated local Synapse administrator account on first use for each configured instance and stores its access token under `data/tokens/`.
+- HTTPS reverse proxy for production
 
 ## Quick start
 
 ```bash
-git clone YOUR_REPOSITORY_URL
-cd matrix-admin-panel
+git clone https://github.com/contact-ad/matrix-admin-panel-community.git
+cd matrix-admin-panel-community
 chmod +x install.sh
 ./install.sh
 ```
 
 The installer creates:
 
-- `.env`
-- `config/instances.json`
-- `data/`
+```text
+.env
+config/instances.json
+data/
+```
 
-Then it builds the Docker container.
-
-The service binds by default to:
+The panel listens by default on:
 
 ```text
 127.0.0.1:8090
 ```
 
-Put Caddy, Nginx, Traefik, HAProxy, or another TLS reverse proxy in front of it.
+Use a reverse proxy such as Caddy, Nginx, Traefik or HAProxy.
 
-### Caddy example
+## Caddy example
 
 ```caddy
 admin.example.com {
@@ -79,7 +88,7 @@ admin.example.com {
 }
 ```
 
-### Nginx example
+## Nginx example
 
 ```nginx
 server {
@@ -97,7 +106,11 @@ server {
 
 ## Instance configuration
 
-Instances are configured in `config/instances.json`.
+Instances are configured in:
+
+```text
+config/instances.json
+```
 
 Example:
 
@@ -115,51 +128,138 @@ Example:
 ]
 ```
 
-You can add additional Synapse containers to the same JSON file. Every `slug` must be unique.
+Fields:
 
-`postgres_container` is optional and is only used for the status card. User management uses Synapse's Admin API rather than direct PostgreSQL queries.
+- `slug`: unique internal identifier
+- `name`: display name
+- `chat_domain`: Matrix homeserver domain
+- `rtc_domain`: optional MatrixRTC domain
+- `synapse_container`: Synapse Docker container name
+- `postgres_container`: optional PostgreSQL container name
+- `primary`: marks the main instance
+
+Multiple Synapse instances can be configured in the same file.
+
+## Synapse service account
+
+For each configured Matrix instance, the panel can create a dedicated local Synapse administrator account.
+
+Its access token is stored in:
+
+```text
+data/tokens/
+```
+
+These tokens are sensitive and must never be committed to Git.
 
 ## Account lifecycle
 
-### Deactivate
+### Create user
 
-Uses Synapse deactivation with:
+Administrators can create local Matrix users with:
+
+- Matrix username
+- Display name
+- Password
+- Administrator role
+
+### Reset password
+
+The panel can reset a user's password and invalidate existing sessions.
+
+### Deactivate account
+
+Deactivation uses:
 
 ```text
 erase=false
 ```
 
-The account can later be reactivated with a new password.
+The account becomes unavailable but can later be reactivated.
 
-### Reactivate
+### Reactivate account
 
-The portal sets:
+A deactivated account can be reactivated with a new password.
+
+The panel sets:
 
 ```text
 deactivated=false
 ```
 
-and requires a new local password.
-
 ### Erase account
 
-Uses:
+Account erasure uses:
 
 ```text
 erase=true
 ```
 
-The action is treated as irreversible from the portal.
+This action is treated as irreversible from the administration panel.
 
-The portal deliberately **does not redact old room messages or delete files already shared in rooms**, because those rooms may still be actively used by other members.
+The panel deliberately **does not delete or redact old room messages or files already shared in rooms**.
 
-## Portal MFA
+This preserves the history of rooms that may still be actively used by other members.
 
-The initial superadmin must configure TOTP MFA.
+## Portal authentication
 
-Supported authenticator applications include standard TOTP-compatible applications such as Microsoft Authenticator, Google Authenticator, 1Password and Bitwarden.
+The installer creates the initial portal administrator.
 
-Recovery codes are shown once when MFA is enabled.
+Passwords are stored as secure password hashes.
+
+Plaintext passwords are not stored.
+
+## MFA
+
+TOTP MFA is supported and required for privileged portal accounts.
+
+Compatible applications include:
+
+- Microsoft Authenticator
+- Google Authenticator
+- Bitwarden
+- 1Password
+- Other standard TOTP applications
+
+Recovery codes are generated during MFA setup.
+
+## Client portal accounts
+
+Portal accounts can be restricted to a specific Matrix instance.
+
+This is useful for service providers managing multiple independent Matrix environments.
+
+## Audit log
+
+The portal keeps an audit log for administrative operations such as:
+
+- Login
+- Failed login
+- Matrix user creation
+- Password reset
+- Account deactivation
+- Account reactivation
+- Account erasure
+- MFA configuration
+- Portal account creation
+
+## Docker status
+
+The dashboard can display the status of configured Docker containers such as:
+
+```text
+Synapse
+PostgreSQL
+```
+
+Possible states include:
+
+```text
+running
+healthy
+stopped
+absent
+```
 
 ## Backups
 
@@ -174,34 +274,185 @@ config/instances.json
 
 Protect these files as secrets.
 
-`upgrade.sh` creates a local backup of the portal database and service tokens before rebuilding the container.
+The provided upgrade script creates a local backup before rebuilding the container:
+
+```bash
+./upgrade.sh
+```
+
+Backups are stored under:
+
+```text
+backups/
+```
 
 ## Updating
 
-For a Git checkout:
+If installed using Git:
 
 ```bash
+cd matrix-admin-panel-community
 git pull
 ./upgrade.sh
 ```
 
-Review release notes before upgrading.
+Review release notes before updating a production environment.
+
+## Environment configuration
+
+The project includes:
+
+```text
+.env.example
+```
+
+Example:
+
+```env
+APP_SECRET=CHANGE_ME_WITH_A_LONG_RANDOM_VALUE
+BOOTSTRAP_ADMIN_USER=admin
+BOOTSTRAP_ADMIN_HASH=CHANGE_ME_WITH_INSTALL_SCRIPT
+
+PANEL_BRAND=Matrix Admin Panel
+PANEL_TITLE=Matrix Admin
+MFA_ISSUER=Matrix Admin Panel
+SESSION_COOKIE_SECURE=true
+PANEL_PORT=8090
+
+MATRIX_NETWORK=matrix_default
+INSTANCE_CONFIG=/config/instances.json
+
+SERVICE_ADMIN_DISPLAY_NAME=Matrix Admin Service
+```
+
+Never commit your real `.env` file.
+
+## Files that must remain private
+
+Never publish:
+
+```text
+.env
+data/
+backups/
+config/instances.json
+*.db
+*.sqlite
+*.sqlite3
+```
+
+The repository includes a `.gitignore` file to help prevent accidental publication.
+
+## Project structure
+
+```text
+matrix-admin-panel-community/
+├── app.py
+├── matrix_ops.py
+├── cli.py
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+├── install.sh
+├── upgrade.sh
+├── VERSION
+├── README.md
+├── SECURITY.md
+├── CONTRIBUTING.md
+├── CHANGELOG.md
+├── PUBLICATION_CHECKLIST.md
+├── LICENSE
+├── .env.example
+├── .gitignore
+├── config/
+│   └── instances.example.json
+├── static/
+│   ├── app.js
+│   └── style.css
+└── templates/
+    ├── audit.html
+    ├── base.html
+    ├── client.html
+    ├── dashboard.html
+    ├── login.html
+    ├── mfa_setup.html
+    ├── mfa_verify.html
+    └── portal_users.html
+```
 
 ## Current limitations
 
-- Designed for Docker-hosted Synapse instances reachable on a shared Docker network.
-- Local-password accounts are the primary supported user-management model.
-- The panel does not provision complete Matrix/Synapse stacks.
-- No LDAP/SSO identity lifecycle management is included.
-- UI language is currently French.
-- Docker socket access is a deliberate architectural trade-off and should be treated as privileged access.
+- Designed primarily for Docker-hosted Synapse installations
+- Local Matrix password accounts are the primary supported account type
+- LDAP lifecycle management is not included
+- SSO lifecycle management is not included
+- The panel does not install a complete Matrix server
+- The panel does not configure MatrixRTC or LiveKit
+- The current interface language is primarily French
+- Docker socket access gives the portal privileged access to the host
+
+## Security architecture
+
+The current version uses Docker access to execute:
+
+```text
+register_new_matrix_user
+```
+
+inside the Synapse container and to inspect container status.
+
+This makes deployment easy but gives the administration panel highly privileged access.
+
+Future versions may replace direct Docker socket access with a restricted helper service.
+
+## Contributing
+
+Contributions are welcome.
+
+Please read:
+
+```text
+CONTRIBUTING.md
+```
+
+before submitting a pull request.
+
+## Security issues
+
+Please read:
+
+```text
+SECURITY.md
+```
+
+Do not publicly disclose exploitable vulnerabilities before the maintainer has had time to investigate them.
 
 ## License
 
-This repository is intended to be published under **GNU AGPL-3.0-or-later**.
+Matrix Admin Panel Community is released under:
 
-See [LICENSE](LICENSE).
+```text
+GNU AGPL-3.0-or-later
+```
+
+See `LICENSE` for details.
 
 ## Disclaimer
 
-This is an independent community project. It is not an official Matrix.org Foundation, Element, or Synapse product.
+Matrix Admin Panel Community is an independent community project.
+
+It is **not** an official product of:
+
+- Matrix.org Foundation
+- Element
+- Synapse
+
+Matrix and related trademarks belong to their respective owners.
+
+## Version
+
+Current Community release:
+
+```text
+v1.0.0
+```
